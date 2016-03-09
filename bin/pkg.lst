@@ -1,0 +1,37 @@
+/**
+
+ Copyright 2007-2015, The JSVM Project. 
+ All rights reserved.
+ 
+ *
+ * Author: Hu Dong
+ * Email: hoodng@hotmail.com
+ * Source: https://github.com/hoodng/JSVM2.git
+ */
+
+/*var tasks = */{
+    list: ["jsrecore", "jsreui"],
+
+    jsrecore: {
+        srcroot: "../jsvm/src",
+        despath: "../jsvm/lib/jsre-core.js",
+        files: [
+        "js/lang/Class.js",
+        "js/lang/Math.js",
+        "js/lang/String.js",        
+        "js/lang/Object.js",
+        "js/util/Event.js",
+        "js/util/EventTarget.js",
+        "js/lang/System.js"
+        ]
+    },
+
+    jsreui: {
+        srcroot: "../jsvm/src",
+        despath: "../jsvm/lib/jsre-ui.js",
+        files: [
+        ]        
+    }
+    
+}/*;*/
+

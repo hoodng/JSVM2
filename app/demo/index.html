@@ -1,0 +1,32 @@
+<!DOCTYPE HTML>
+<html class="jsvm--full-h">
+<head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <!--
+    <script id="j$vm" src="../entry/jsre-jsvm.js" crs="../../jsvm/"
+            classpath="lib/jsre-ui.jz;"></script>
+    -->
+    <script src="../../jsvm/lib/jsre-core.js"></script>
+    
+</head>
+<body class="jsvm--full-h jsvm--noborder jsvm--nomargin jsvm--nopadding jsvm--font jsvm__body"
+      jsvm_entry="demo" jsvm_asapp="true">
+</body>
+<script type="text/javascript">
+
+  $import("js.lang.Class");
+  $import("js.awt.Component");
+  $import("js.util.HashMap");
+
+  var a = {
+    k1: 1, k2: "a", k3:{k4: [1, 2, 3], k5:{k6:{}}}
+  };
+
+  var b = { k3:{k7:{k8:["a","b","c"]}}}
+  b = J$VM.System.objectCopy(a, b, true);
+
+  J$VM.System.err.println(b);
+  
+</script>
+</html>
