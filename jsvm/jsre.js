@@ -12,109 +12,318 @@ self.js = self.js || {};
 
 (function(){
 
-    var typeOf = this.typeOf = function(x, type){
-        var s = Object.prototype.toString.call(x);
-        s = s.substring(8, s.length-1);
-        return type ? s === type : s;
-    },
-
-    types = [
+    J$VM = {};
+    J$VM.__version__ = "1.0.";
+    J$VM.env = {
+        j$vm_ajax_nocache: true,
+        j$vm_ajax_timeout: 600000
+    };
+    J$VM.isworker = function(){
+        return !self.document;
+    }();
+    
+    var TYPES = [
         "Null", "Undefined","Function", "Object",
         "Array", "Boolean", "Number","String","Date"],
 
-    j$vmkeys = {
-        __impls__:1, __super__:1, __hosts__:1, __timer__:1,
-        __defined__:1 },
+        SANDBOX = {name:"j$vm-sandbox"},
+        BREAKLOOP = "break-loop", 
+        sliceArgs = Array.prototype.slice,
+        typeString= Object.prototype.toString,
+    
+        lang = this.lang = {Class:{}, System:{}},
+        Class = lang.Class, System = lang.System,
+    
+        typeOf = Class.typeOf = function(x, type){
+            var s = typeString.call(x);
+            s = s.substring(8, s.length-1);
+            return arguments.length > 1 ? s === type : s;
+        };
 
-    BREAKLOOP = "break-loop",
-
-    slice = Array.prototype.slice;
-
-    (function($){
-        types.forEach(function(type){
+    (function(){
+        TYPES.forEach(function(type){
             this["is"+type] = function(x){
                 return typeOf(x, type);
             };
         });
-    }).call(this);
+    }).call(Class);
 
-    (function($){
-
-        this.$extend = function(clazz){
-            var proto, cons;
-            if($.isFunction(clazz)){
-                cons = clazz; proto = new (clazz)();
-                proto.constructor = clazz;
-            }else if(clazz){
-                cons = clazz.constructor; proto = clazz;
-                proto.constructor = cons;
+    (function(){
+        var props = J$VM.env, os;
+            
+        // Init standard output
+        (function(){
+            if(!J$VM.isworker){
+                os = self.console || {
+                    info: function(s){},
+                    error: function(s){},
+                    log: function(s){}
+                };
+            }else{
+                var post = self.postMessage;
+                os = {};
+                os.info = function(s){
+                    post({type:"inf", data:s});
+                };
+                os.error = function(s){
+                    post({type:"err", data:s});
+                };
+                os.log = function(s){
+                    post({type:"log", data:s});
+                };
             }
-            this.prototype = proto;
+        })();
 
-            return this;
+        this.out = {println: function(s){os.info(s);}};
+        this.err = {println: function(s){os.error(s);}};
+        this.log = {println: function(s){
+            if(this.logEnabled()) os.log(s);}};
+        
+        this.logEnabled = function(){
+            return this.getProperty("j$vm_log") === true;
         };
 
-        this.$implements = function(clazz){
-            var proto = this.prototype, impls;
+        this.hasProperty = function(key){
+            return props.hasOwnProperty(key);
+        };
 
-            impls = proto.__impls__ = [].concat(proto.__impls__ || []);
+        this.getProperty = function(key, defValue){
+            return this.hasProperty(key) ?
+                props[key] || defValue : defValue;
+        };
 
-            (function(fn){
-                if($.isFunction(fn)){
-                    impls.push(fn);
-                    fn.$decorate(proto);
+        this.setProperty = function(key, value){
+            var pre = null;
+            if(key){
+                pre = props[key];
+                props[key] = value;
+            }
+            return pre;
+        };
+
+        this.forArray = function(set, fn, thi$, args){
+            var BK = BREAKLOOP;
+            thi$ = thi$ || SANDBOX;
+            args = sliceArgs.call(arguments, 3);
+            for(var i=0, len=set.length; i<len; i++){
+                try{
+                    fn.apply(thi$, [set[i], i, set].concat(args));
+                } catch (x) {
+                    if(x === BK) break;
+                    throw x;
                 }
-            }).$forEach(slice.call(arguments));
-
-            return this;
+            }
         };
 
-        this.$decorate = function(obj, replace){
-            replace = replace || {};
-            if(!this.__defined__) new (this)();
-
-            (function(e, k, set){
-                if(!j$vmkeys[k] && !obj[k] || replace[k]){
-                    obj[k] = e;
+        this.forObject = function(set, fn, thi$, args){
+            var BK = BREAKLOOP, has = Object.prototype.hasOwnProperty;
+            thi$ = thi$ || SANDBOX;
+            args = sliceArgs.call(arguments, 3);
+            for(var i in set){
+                if(!has.call(set, i)) continue;
+                try{
+                    fn.apply(thi$, [set[i], i, set].concat(args));
+                } catch (x) {
+                    if(x === BK) break;
+                    throw x;
                 }
-            }).forEach(this.prototype);
-
-            return obj;
+            }
         };
 
-        this.$override = function(fn){
-            this.__super__ = fn;
-            return this;
+        this.objectCopy = function(src, des, deep, unmerge){
+            switch(Class.typeOf(src)){
+                case "Object":
+                des = des || {};
+                this.forObject(src, function(v, k){
+                    des[k] = (!deep || !Class.isObject(v)) ? v :
+                        this.objectCopy(v, (unmerge ? null : des[k]),
+                                        deep, unmerge);
+                }, this);
+                break;
+                case "Array":
+                des = this.arrayCopy(src, 0, des, 0, src.length, deep);
+                break;
+                default:
+                des = src;
+            }
+            return des;
         };
 
-        this.$bind = function(thi$, args){
-            var fn = this, agent; args = slice.call(arguments, 1);
-            agent = function(){
-                return fn.apply(thi$,
-                    args.concat(slice.call(arguments)));
-            };
-
-            return agent;
+        this.arrayCopy = function(src, srcIdx, des, desIdx, length, deep){
+            var len = src.length - srcIdx, BK = BREAKLOOP;
+            length = Class.isNumber(length) ?
+                ((length > len) ? len:length) : len;
+            des = des || [];
+            this.forArray(src, function(v, i){
+                if(i < srcIdx) return;
+                if(i > srcIdx + length -1) throw BK;
+                des[desIdx+i-srcIdx] = (!deep || !Class.isObject(v)) ? v :
+                    this.objectCopy(v, null, deep);
+            }, this);
+            return des;
         };
 
-        this.$listen = function(thi$, eventClass, args){
-            var fn = this, agent; args = slice.call(arguments, 2);
-            agent = function(e){
-                return fn.apply(thi$,
-                    [new (eventClass)(e)].concat(args));
-            };
-            agent.__hosts__ = fn;
+        
+        var tasks = [], scheduled;
+        this.queued = function(fn, callback, thi$, args){
+            /*
+             * state: 0: pendding, 1:doing, 2:done 
+             */
+            var task = {state:0, fn: fn, data: null},
+                curTask = tasks.length > 0 ?
+                tasks[tasks.length-1] : null;
 
-            return agent;
+            fn.ctx = {thi$: thi$ || SANDBOX,
+                      callback: callback,
+                      args:sliceArgs.call(arguments, 3)}
+
+            if(!curTask || curTask.state === 1){
+                tasks.push(task);
+                scheduled = false;
+            }else{
+                curTask.tasks = curTask.tasks || [];
+                curTask.tasks.push(task);
+            }
+
+            if(!scheduled){
+                scheduled = true;
+                _run.$delay(0, this);
+            }
         };
 
-        this.$delay = function(thi$, timeout, args){
-            var fn = this, timer; args = slice.call(arguments, 2);
+        var _run = function(){
+            var fn, ctx, promise, 
+                curTask = tasks.length > 0 ?
+                tasks[tasks.length-1] : null;
+            
+            if(!curTask){
+                scheduled = false;
+                return;
+            }
+
+            fn = curTask.fn; ctx = fn.ctx;
+            switch(curTask.state){
+                case 0: // Pendding state
+                curTask.state = 1; // change to doing state
+                promise = {data: curTask.data,
+                           done: _done.$bind(this)};
+                fn.apply(ctx.thi$, [promise].concat(ctx.args));
+                break;
+
+                case 2: // Done state
+                if(Class.isFunction(ctx.callback)){
+                    ctx.callback.apply(
+                        ctx.thi$, [curTask.data].concat(ctx.args));
+                }
+                fn.ctx = null;
+
+                var task = curTask.tasks ?
+                    curTask.tasks.shift() : null;
+                if(task){
+                    // task.state shoule be 0
+                    task.data  = curTask.data;
+                    task.tasks = curTask.tasks;
+                    tasks[tasks.length-1] = task;
+                }else{
+                    curTask = tasks.pop();
+                    task = tasks.length > 0 ?
+                        tasks[tasks.length-1] : null;
+                    if(task){
+                        // task.state shoule be 1
+                        task.state = 2;
+                        task.data = curTask.data;
+                    }
+                }
+                curTask.data = null;
+                curTask.tasks= null;
+                curTask.fn = null;
+                _run.call(this);
+                break;
+
+                default:
+                throw new Error("Unexcept state: "+curTask.state);
+                break;
+            }
+        };
+
+        var _done = function(data){
+            var curTask = tasks[tasks.length-1];
+            curTask.state = 2;
+            curTask.data = data;
+            _run.call(this);
+        };
+        
+        
+    }).call(System);
+
+    (function(){
+        
+        this.$forEach = function(set, thi$, args){
+            System["for"+typeOf(set)].apply(
+                SANDBOX, [set, this].concat(sliceArgs.call(arguments,1)));
+        };
+
+        this.$map = function(set, thi$, args){
+            var fn = this, ret = Class.isArray(set) ? [] : {};
+            thi$ = thi$ || SANDBOX;
+            args = sliceArgs.call(arguments, 2);
+            (function(e, i, set){
+                ret[i] = fn.apply(thi$, [e, i, set].concat(args));
+            }).$forEach(set);
+
+            return ret;
+        };
+
+        this.$filter = function(set, thi$, args){
+            var fn = this, isA = Class.isArray(set),
+                ret = isA ? [] : {};
+            thi$ = thi$ || SANDBOX;
+            args = sliceArgs.call(arguments, 2);
+            (function(e, i, set){
+                if(fn.apply(thi$, [e, i, set].concat(args))){
+                    isA ? ret.push(e) : ret[i] = e;
+                }
+            }).$forEach(set);
+
+            return ret;
+        };
+
+        this.$some = function(set, thi$, args){
+            var fn = this, BK = BREAKLOOP, ret = false;
+            thi$ = thi$ || SANDBOX;
+            args = sliceArgs.call(arguments, 2);
+            (function(e, i, set){
+                if(fn.apply(thi$, [e, i, set].concat(args))){
+                    ret = true;
+                    throw BK;
+                }
+            }).$forEach(set);
+
+            return ret;
+        };
+        
+        this.$every = function(set, thi$, args){
+            var fn = this, BK = BREAKLOOP, ret = true;
+            thi$ = thi$ || SANDBOX;
+            args = sliceArgs.call(arguments, 2);
+            (function(e, i, set){
+                if(!fn.apply(thi$, [e, i, set].concat(args))){
+                    ret = false;
+                    throw BK;
+                }
+            }).$forEach(set);
+
+            return ret;
+        };
+
+        this.$delay = function(timeout, thi$, args){
+            var fn = this, timer;
+            thi$ = thi$ || SANDBOX;
+            args = sliceArgs.call(arguments, 2);
             timer = self.setTimeout(function(){
                 fn.$cancel(timer);
                 fn.apply(thi$, args);
             }, timeout || 1);
-
             fn.__timer__ = (fn.__timer__ || []);
             fn.__timer__.push(timer);
 
@@ -124,120 +333,107 @@ self.js = self.js || {};
         this.$cancel = function(timer){
             var timers = this.__timer__, i;
             if(!timers || timers.length == 0) return;
-            if(!timer){
-                self.clearTimer(timers.shift());
-            }else if((function(e, k, set){
-                i = k;
-                return timer === e;
+            if(arguments.length === 0){
+                self.clearTimeout(timers.shift());
+            }else if((function(e, k){
+                i = k; return timer === e;
             }).$some(timers)){
                 timers.splice(i, 1);
-                self.clearTimer(timer);
+                self.clearTimeout(timer);
             }
         };
 
-        var loop = {
-            "Array": function(fn, set, thi$, args){
-                for(var i=0, len=set.length; i<len; i++){
-                    try{
-                        fn.apply(thi$, [set[i], i, set].concat(args));
-                    }catch(ex){
-                        if(BREAKLOOP === ex) break;
-                        throw ex;
-                    }
-                }
-            },
-
-            "Object": function(fn, set, thi$, args){
-                for(var i in set){
-                    if(!set.hasOwnProperty(i)) continue;
-
-                    try{
-                        fn.apply(thi$, [set[i], i, set].concat(args));
-                    }catch(ex){
-                        if(BREAKLOOP === ex) break;
-                        throw ex;
-                    }
-                }
+        this.$while = function(testP, thi$, args){
+            var fn = this, hasNext = testP;
+            thi$ = thi$ || SANDBOX;
+            args = sliceArgs.call(arguments, 2);
+            if(Class.isFunction(testP)){
+                hasNext = testP.apply(thi$, args);
+            }
+            if(hasNext){
+                fn.apply(thi$, args);
+                (function(){
+                    fn.$while.apply(fn, [testP, thi$].concat(args));
+                }).$delay(1);
             }
         };
 
-        this.$forEach = function(set, thi$, args){
-            loop[typeOf(set)](
-                this, set, thi$, slice.call(arguments, 2));
+        this.$queued = function(callback, thi$, args){
+            System.queued.apply(System,[this].concat(
+                sliceArgs.call(arguments)))
         };
 
-        this.$map = function(set, thi$, args){
-            var fn = this, ret = $.isArray(set) ? [] : {};
-
-            args = slice.call(arguments, 2);
-            (function(e, i, set){
-                ret[i] = fn.apply(thi$, [e, i, set].concat(args));
-            }).$forEach(set);
-
-            return ret;
+        this.$bind = function(thi$, args){
+            var fn = this;
+            args = sliceArgs.call(arguments, 1);
+            return function(){
+                return fn.apply(
+                    thi$,
+                    sliceArgs.call(arguments).concat(args));
+            };
         };
 
-        this.$filter = function(set, thi$, args){
-            var fn = this, isArray = $.isArray(set),
-                ret = isArray ? [] : {};
-
-            args = slice.call(arguments, 2);
-            (function(e, i, set){
-                if(fn.apply(thi$, [e, i, set].concat(args))){
-                    isArray ? ret.push(e) : ret[i] = e;
-                }
-            }).$forEach(set);
-
-            return ret;
+        this.$override = function(fn){
+            this.__super__ = fn;
+            return this;
         };
 
-        this.$some = function(set, thi$, args){
-            var fn = this, ret = false;
+        self.$super = function(thi$, args){
+            var caller = self.$super.caller;
+            args = arguments.length > 1 ?
+                sliceArgs.call(arguments, 1):
+                sliceArgs.call(caller.arguments);
+            return caller.__super__.apply(thi$, args);
+        };
 
-            args = slice.call(arguments, 2);
-            (function(e, i, set){
-                if(fn.apply(thi$, [e, i, set].concat(args))){
-                    ret = true;
-                    throw BREAKLOOP;
-                }
-            }).$forEach(set);
-
-            return ret;
+        self.$define = function(fn){
+            if(!Class.isFunction(fn)) return;
+            
+            (function(promise){
+                fn.call(SANDBOX);
+                promise.done();
+            }).$queued();
         };
         
-        this.$every = function(set, thi$, args){
-            var fn = this, ret = true;
+        this.$extend = function(clazz){
+            var proto;
+            if(Class.isFunction(clazz)){
+                proto = new (clazz)(); proto.constructor = clazz;
+            }else if(clazz){
+                proto = clazz;
+            }
+            this.prototype = proto;
+            return this;
+        };
 
-            args = slice.call(arguments, 2);
-            (function(e, i, set){
-                if(!fn.apply(thi$, [e, i, set].concat(args))){
-                    ret = false;
-                    throw BREAKLOOP;
+        this.$decorate = function(obj, replace){
+            var clazz = this;
+            if(!obj) return null;
+            if(!clazz.__defined__) new (clazz)();
+            replace = replace || {};
+            (function(e, k){
+                if(Class.isFunction(e) && (!obj[k] || replace[k])){
+                    obj[k] = e;
                 }
-            }).$forEach(set);
-
-            return ret;
+            }).forEach(clazz.prototype);
+            return obj;
+        };
+        
+        this.$implements = function(clazz){
+            var proto = this.prototype, impls;
+            impls = proto.__impls__ = [].concat(proto.__impls__ || []);
+            (function(fn){
+                if(Class.isFunction(fn)){
+                    impls.push(fn);
+                    fn.$decorate(proto);
+                }
+            }).$forEach(sliceArgs.call(arguments));
+            return this;
         };
 
-        this.$async = function(){
-            var fn = this;
-            asyncQ.submit(fn.$bind.apply(self, slice.call(arguments)));
-        };
+    }).call(Function.prototype);
 
-    }).call(Function.prototype, this);
-
-    var asyncQ = new function(){
-
-        this.submit = function(fn){
-        };
-
-    }();
-
-    this.lang = {};
-    this.util = {};
-    this.net = {};
-
-}).call(js);
+})();
 
 var boot = function(){
 

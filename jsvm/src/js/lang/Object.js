@@ -33,7 +33,7 @@ js.lang.Object = function(def){
         return this.__hash__;
     };
 
-    thi$.Runtime = function(){
+    thi$.getRuntime = function(){
         this.getContextAttr("__runtime__");
     };
 
@@ -61,11 +61,6 @@ js.lang.Object = function(def){
             ctx = this.getObject(ctx._chain__);
             return ctx ? ctx.getContextAttr(name) : null;
         }
-    };
-
-    thi$.rmvContextAttr = function(name){
-        var ctx = objs[this.uuid()];
-        if(name) delete ctx[name];
     };
 
     thi$.putContextAttr = function(name, value){
