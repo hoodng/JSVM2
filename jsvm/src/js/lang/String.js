@@ -24,9 +24,7 @@ js.lang.String = function(){
         "&amp;" : "&",
         "&nbsp;": " ",
         "&quot;": "\"",
-        "&copy;": "©",
-        "<br/>" : String.fromCharCode(0x0A)
-        // Add more
+        "&copy;": "©"
     };
 
     var Class = js.lang.Class;

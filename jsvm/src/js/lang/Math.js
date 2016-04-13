@@ -1,6 +1,6 @@
 /**
 
-  Copyright 2007-2015, The JSVM Project. 
+  Copyright 2007-2016, The JSVM Project. 
   All rights reserved.
 
  * Author: Hu Dong

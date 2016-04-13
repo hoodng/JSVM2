@@ -1,6 +1,6 @@
 /**
 
-  Copyright 2007-2015, The JSVM Project. 
+  Copyright 2007-2016, The JSVM Project. 
   All rights reserved.
 
  * Author: Hu Dong
@@ -17,44 +17,58 @@ js.lang.Object = function(def){
     }
     var Class = js.lang.Class, objs = {};
 
-    thi$.uuid = function(uuid){
-        if(Class.isString(uuid) && uuid){
-            this.__uuid__ = uuid;
-        }else if(!this.__uuid__){
-            this.__uuid__ = Math.uuid(this.hashCode());
+    /**
+     * 
+     */
+    thi$.uuid = function(){
+        var uuid = this.__uuid__;
+        if(!uuid){
+            uuid = this.__uuid__ = Math.uuid(this.hashCode());
         }
-        return this.__uuid__;
+        return uuid;
     };
 
+    /**
+     * 
+     */
     thi$.hashCode = function(){
-        if(!this.__hash__){
-            this.__hash__ = Math.hash();
+        var hash = this.__hash__;
+        if(!hash){
+            hash = this.__hash__ = Math.hash();
         }
-        return this.__hash__;
+        return hash;
     };
 
+    /**
+     * 
+     */
     thi$.getRuntime = function(){
         this.getContextAttr("__runtime__");
     };
 
-    thi$.getParent = function(){
-        return this.parent;
-    };
-
+    /**
+     * 
+     */
     thi$.getObject = function(uuid){
         var ctx = objs[uuid];
         return ctx ? ctx.__self__ : null;
     };
 
+    /**
+     * 
+     */
     thi$.linkContext = function(uuid){
-        var ctx = objs[this.uuid()];
-        if(uuid && Class.isString(uuid)){
+        var ctx = objs[this.__uuid__];
+        if(Class.isString(uuid) && uuid){
             ctx.__chain__ = uuid;
         }
     };
 
+    /**
+     * 
+     */
     thi$.getContextAttr = function(name){
-        var ctx = objs[this.uuid()], val;
+        var ctx = objs[this.__uuid__], val;
         if(ctx.hasOwnProperty(name)){
             return ctx[name];
         }else{
@@ -63,23 +77,53 @@ js.lang.Object = function(def){
         }
     };
 
+    /**
+     * 
+     */
     thi$.putContextAttr = function(name, value){
-        var ctx = objs[this.uuid()];
+        var ctx = objs[this.__uuid__];
         if(name){
             ctx[name] = value;
         }
     };
 
-    thi$.destroy = function(){
-        this.__local__ = null;
-        delete objs[this.uuid()];
+    /**
+     * 
+     */
+    thi$.setParent = function(parent){
+        var ctx = objs[this.__uuid__];
+        if(parent instanceof CLASS){
+            this.__local__.parent = parent;    
+            if(!ctx.__chain__){
+                ctx.__chain__ = parent.uuid();
+            }
+        }
     };
 
+    /**
+     * 
+     */
+    thi$.getParent = function(){
+        return this.__local__.parent;
+    };
+
+    /**
+     * 
+     */
+    thi$.destroy = function(){
+        this.__local__ = null;
+        objs[this.__uuid__] = null;
+    };
+
+    /**
+     * 
+     */
     thi$._init = function(def){
         if(arguments.length === 0) return;
 
-        var uuid = this.uuid(def.uuid), ctx;
-        ctx = objs[uuid] = (objs[uuid] || {});
+        var uuid = this.__uuid__ = def.uuid || this.uuid(),
+            ctx = objs[uuid] = (objs[uuid] || {});
+
         ctx.__self__ = this;
         this.linkContext(def.context);
         this.id = def.id;

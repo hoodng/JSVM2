@@ -14,7 +14,7 @@ pack-js:
 
 compile-js:
 	$(JSCTOOL) -O 9 -s $(JSVM_PATH)/src -d $(JSVM_PATH)/classes -gzip
-	$(JSCTOOL) -O 9 -s $(JSVM_PATH)/lib -d $(JSVM_PATH)/lib -gzip
+	$(JSCTOOL) -O -1 -s $(JSVM_PATH)/lib -d $(JSVM_PATH)/lib -gzip
 
 make-css: pack-css compile-css
 	echo "make css package"
