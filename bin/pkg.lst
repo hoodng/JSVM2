@@ -10,8 +10,22 @@
  */
 
 /*var tasks = */{
-    list: ["jsrecore", "jsreui"],
+    list: ["jsre", "jsrecore", "jsreui"],
 
+    jsre:{
+        srcroot: "../jsvm/src",
+        despath: "../jsvm/jsre.js",
+        files:[
+        "js/lang/Class.js",
+        "js/lang/Object.js",
+        
+        "js/net/HttpConnection.js",
+        "js/net/URI.js",        
+        "js/util/Storage.js",
+        "js/lang/System.js"
+        ]
+    },
+    
     jsrecore: {
         srcroot: "../jsvm/src",
         despath: "../jsvm/lib/jsre-core.js",

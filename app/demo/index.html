@@ -3,11 +3,9 @@
 <head>
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <!--
-    <script id="j$vm" src="../entry/jsre-jsvm.js" crs="../../jsvm/"
+
+    <script id="j$vm" src="../../jsvm/jsre.js?_=1" crs="."
             classpath="lib/jsre-ui.jz;"></script>
-    -->
-    <script src="../../jsvm/lib/jsre-core.js"></script>
     
 </head>
 <body class="jsvm--full-h jsvm--noborder jsvm--nomargin jsvm--nopadding jsvm--font jsvm__body"
@@ -15,18 +13,19 @@
 </body>
 <script type="text/javascript">
 
-  $import("js.lang.Class");
-  $import("js.awt.Component");
-  $import("js.util.HashMap");
+ var doing = function(p, last){
+     console.log("doing!");
+     p.done(new Date().getTime()-last.getTime());
+ };
 
-  var a = {
-    k1: 1, k2: "a", k3:{k4: [1, 2, 3], k5:{k6:{}}}
-  };
+ var callback = function(data){
+     console.log("callback:" +data);
+ };
 
-  var b = { k3:{k7:{k8:["a","b","c"]}}}
-  b = J$VM.System.objectCopy(a, b, true);
-
-  J$VM.System.err.println(b);
-  
+ (function(p){
+     doing.$delay(10000, this, p, new Date());
+     
+ }).$queue(callback);
+ 
 </script>
 </html>

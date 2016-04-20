@@ -103,20 +103,6 @@ js.lang.String = function(){
             function($0, ch){return ch;});
     };
 
-    var REGX_TRIM = /(^\s*)|(\s*$)/g;
-    this.trim = this.trim || function trim(){
-        var str = this.toString();
-        return str.replace(REGX_TRIM, "");
-    };
-
-    this.endsWith = this.endsWith || function endsWith(suffix) {
-        return this.indexOf(suffix, this.length - suffix.length) !== -1;
-    };
-
-    this.startsWith = this.startsWith || function startsWith(suffix) {
-        return this.indexOf(suffix) === 0;
-    };
-
     this.hashCode = this.hashCode || function hashCode(){
         var hash = this.__hash__, c, i, len;
         if(hash) return hash;
